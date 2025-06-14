@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "password": "5e884898da28047151d0e56f8dc6292773603d0d6aabbdddfba",
+    "role": "admin"
+  },
+  {
+    "id": 2,
+    "username": "autohaus1",
+    "password": "2bb80d537b1da3e38bd30361aa855686bde0ba4abf2b06fa1e0e6d8e6d7efbdf",
+    "role": "user"
+  }
+]
