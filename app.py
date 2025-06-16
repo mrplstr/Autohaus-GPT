@@ -1,64 +1,48 @@
 import streamlit as st
-from auth import login, logout, is_logged_in, get_current_user
-from gpt_manager import load_gpts, add_gpt, delete_gpt
+import json
+import hashlib
+import os
 
-st.set_page_config(page_title="Autohaus GPT", layout="wide")
+USERS_FILE = "data/users.json"
 
-def main():
-    if not is_logged_in():
-        login()
-    else:
-        user = get_current_user()
+def load_users():
+    if not os.path.exists(USERS_FILE):
+        return []
+    with open(USERS_FILE, "r") as f:
+        return json.load(f)
 
-        # Sidebar
-        st.sidebar.markdown(f"👤 Eingeloggt als: `{user['username']}` ({user['role']})")
-        logout()
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
-        # Hauptbereich
-        st.title("🚗 Autohaus GPT")
+def login():
+    if "user" not in st.session_state:
+        st.sidebar.title("🔐 Login")
+        username = st.sidebar.text_input("Benutzername")
+        password = st.sidebar.text_input("Passwort", type="password")
+        if st.sidebar.button("Einloggen"):
+            users = load_users()
+            hashed = hash_password(password)
+            matched_user = next((u for u in users if u["username"] == username and u["password"] == hashed), None)
 
-        if user["role"] == "admin":
-            st.subheader("🛠 Adminbereich – GPT-Verwaltung")
-
-            # GPT-Erstellungsformular
-            with st.expander("➕ Neuen GPT erstellen"):
-                name = st.text_input("Name")
-                system_prompt = st.text_area("System-Prompt", height=150)
-                temperature = st.slider("Temperatur", 0.0, 1.0, 0.7)
-                max_tokens = st.number_input("Max Tokens", min_value=100, max_value=4000, value=800)
-
-                if st.button("GPT hinzufügen"):
-                    if name and system_prompt:
-                        add_gpt(name, system_prompt, temperature, max_tokens)
-                        st.success(f"{name} wurde gespeichert.")
-                        st.experimental_rerun()
-                    else:
-                        st.error("Bitte Name und Prompt angeben.")
-
-            # Bestehende GPTs anzeigen
-            st.subheader("🗂️ Vorhandene GPTs")
-            gpts = load_gpts()
-            if gpts:
-                for gpt in gpts:
-                    with st.container():
-                        st.markdown(f"**{gpt['name']}** (ID: {gpt['id']})")
-                        st.code(gpt['system_prompt'], language="markdown")
-                        cols = st.columns(3)
-                        cols[0].markdown(f"🌡️ Temperatur: `{gpt['temperature']}`")
-                        cols[1].markdown(f"📏 Max Tokens: `{gpt['max_tokens']}`")
-                        if cols[2].button("🗑️ Löschen", key=f"del_{gpt['id']}"):
-                            delete_gpt(gpt['id'])
-                            st.warning(f"{gpt['name']} wurde gelöscht.")
-                            st.experimental_rerun()
+            if matched_user:
+                st.session_state["user"] = {
+                    "id": matched_user["id"],
+                    "username": matched_user["username"],
+                    "role": matched_user["role"]
+                }
+                st.success(f"Willkommen, {matched_user['username']} 👋")
+                st.experimental_set_query_params(logged_in="1")  # Triggered reload
             else:
-                st.info("Noch keine GPTs erstellt.")
+                st.error("Falscher Benutzername oder Passwort")
 
-        elif user["role"] == "user":
-            st.subheader("🤖 Meine GPTs")
-            st.info("In Kürze kannst du hier mit deinen GPTs chatten.")
+def logout():
+    if "user" in st.session_state:
+        if st.sidebar.button("🚪 Logout"):
+            del st.session_state["user"]
+            st.experimental_set_query_params()  # Reset URL params
 
-        else:
-            st.warning("Unbekannte Rolle. Bitte kontaktiere den Administrator.")
+def is_logged_in():
+    return "user" in st.session_state
 
-if __name__ == "__main__":
-    main()
+def get_current_user():
+    return st.session_state.get("user", None)
